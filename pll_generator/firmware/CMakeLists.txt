@@ -23,7 +23,7 @@ if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
-set(PICO_BOARD pico2 CACHE STRING "Board type")
+set(PICO_BOARD pico2_w CACHE STRING "Board type")
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
@@ -36,6 +36,7 @@ pico_sdk_init()
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(firmware firmware.c )
+add_subdirectory(adf4351)
 
 pico_set_program_name(firmware "firmware")
 pico_set_program_version(firmware "0.1")
@@ -56,6 +57,7 @@ target_include_directories(firmware PRIVATE
 # Add any user requested libraries
 target_link_libraries(firmware 
         hardware_spi
+        adf4351
         )
 
 pico_add_extra_outputs(firmware)
