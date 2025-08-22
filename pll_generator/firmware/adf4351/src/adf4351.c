@@ -39,20 +39,18 @@ bool adf_init(spi_inst_t *spi) {
 
     gpio_init(PIN_PLL_CE);
     gpio_set_dir(PIN_PLL_CE, GPIO_OUT);
-    gpio_put(PIN_PLL_CE, 1); // enable by default (may be active-high on your board)
+    gpio_put(PIN_PLL_CE, 0);
 
     gpio_init(PIN_PLL_LD);
     gpio_set_dir(PIN_PLL_LD, GPIO_IN);
 
     // Write R5..R0 as initialization (datasheet requires writing R5 first)
     // R5..R2 use library defaults; R1 and R0 will be set by adf_set_frequency
-    adf_write_reg(REG_R5); // reg 5 (control bits 101)
-    adf_write_reg(REG_R4); // reg 4 (control bits 100)
-    adf_write_reg(REG_R3); // reg 3 (control bits 011)
-    adf_write_reg(REG_R2); // reg 2 (control bits 010)
-
-    // small delay for device to process
-    sleep_ms(10);
+    // adf_write_reg(REG_R5); // reg 5 (control bits 101)
+    // adf_write_reg(REG_R4); // reg 4 (control bits 100)
+    // adf_write_reg(REG_R3); // reg 3 (control bits 011)
+    // adf_write_reg(REG_R2); // reg 2 (control bits 010)
+    // sleep_ms(10);
     return true;
 }
 
@@ -70,7 +68,7 @@ void adf_set_frequency(double freq_hz) {
     const double VCO_MAX = 4400e6;
     const int dividers[] = {1,2,4,8,16,32,64};
     int rf_div = 1;
-    double vco = freq_hz;
+    double vco;
     for (int i = 0; i < (int)(sizeof(dividers)/sizeof(dividers[0])); i++) {
         double candidate = freq_hz * dividers[i];
         if (candidate >= VCO_MIN && candidate <= VCO_MAX) {
@@ -87,16 +85,16 @@ void adf_set_frequency(double freq_hz) {
     double fPFD = ref / rcounter;
 
     // Choose MOD (12 bit max = 4095). Higher MOD gives better resolution; choose 4095.
-    uint32_t MOD = 4095;
+    uint32_t mod_value = 4095;
 
     // Calculate N = vco / fPFD
     double N = vco / fPFD;
-    uint32_t INTpart = (uint32_t)floor(N);
-    double frac = N - (double)INTpart;
-    uint32_t FRAC = (uint32_t)round(frac * MOD);
-    if (FRAC >= MOD) {
-        FRAC = 0;
-        INTpart += 1;
+    uint32_t int_part = (uint32_t)floor(N);
+    double frac = N - (double)int_part;
+    uint32_t frac_part = (uint32_t)round(frac * mod_value);
+    if (frac_part >= mod_value) {
+        frac_part = 0;
+        int_part += 1;
     }
 
     // prescaler: use 4/5 (PR1=0) if VCO <= 3600 MHz, else 8/9 (PR1=1)
@@ -104,14 +102,14 @@ void adf_set_frequency(double freq_hz) {
 
     // Build R0 and R1 per datasheet bit positions
     // R0: [INT(16 bits) << 15] | [FRAC(12 bits) << 3] | reg = 0
-    uint32_t R0 = ((INTpart & 0xFFFF) << 15) | ((FRAC & 0x0FFF) << 3) | 0x0; // control bits 000
+    uint32_t r0 = ((int_part & 0xFFFF) << 15) | ((frac_part & 0x0FFF) << 3) | 0x0; // control bits 000
 
     // R1: [phase (12 bits) << 15] | [MOD(12 bits) << 3] | reg=1
     uint32_t phase = 0; // default
-    uint32_t R1 = ((phase & 0x0FFF) << 15) | ((MOD & 0x0FFF) << 3) | 0x1;
+    uint32_t r1 = ((phase & 0x0FFF) << 15) | ((mod_value & 0x0FFF) << 3) | 0x1;
 
     // Set prescaler bit (DB27) in R1 if needed
-    if (prescaler_bit) R1 |= (1U << 27);
+    if (prescaler_bit) r1 |= (1U << 27);
 
     // Some modules require additional bits in R4 for the RF output divider setting.
     // R4 bits for RF output divider: bits [22:20] often control RF output divider (example mapping)
@@ -144,12 +142,9 @@ void adf_set_frequency(double freq_hz) {
     adf_write_reg(r4);
     adf_write_reg(r3);
     adf_write_reg(r2);
-    adf_write_reg(R1);
-    adf_write_reg(R0);
-
-    // After programming, wait some ms for lock (depends on loop filter)
-    sleep_ms(20);
+    adf_write_reg(r1);
+    adf_write_reg(r1);
 
     // Increase SPI speed after init
-    spi_set_baudrate(adf4351_spi, 8000000);
+    // spi_set_baudrate(adf4351_spi, 8000000);
 }

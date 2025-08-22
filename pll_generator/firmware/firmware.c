@@ -2,6 +2,7 @@
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
 #include <math.h>
+#include "adf4351.h"
 
 // SPI Defines
 // We are going to use SPI 0, and allocate it to the following GPIO pins
@@ -11,7 +12,6 @@
 #define PIN_CS   17
 #define PIN_SCK  18
 #define PIN_MOSI 19
-
 
 
 int main()
@@ -36,9 +36,10 @@ int main()
         if (c == 'f') {
             // example: set 100 MHz
             adf_set_frequency(100e6);
-            sleep_ms(50);
-    
-            printf("Locked? %s\n", adf_is_locked() ? "YES" : "NO");
+            for(uint8_t i = 0; i < 4; i++) {
+                sleep_ms(50);
+                printf("Locked? %s\n", adf_is_locked() ? "YES" : "NO");
+            }
             continue;
         }
         if (c == 's') {
